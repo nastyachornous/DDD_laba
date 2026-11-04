@@ -1,0 +1,10 @@
+build/
+cmake-build-*/
+.vscode/
+*.exe
+*.o
+*.obj
+*.a
+*.lib
+*.dll
+*.pdb
