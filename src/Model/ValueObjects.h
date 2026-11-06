@@ -41,6 +41,10 @@ namespace ReservationDomain
         {
             return value;
         }
+        bool operator==(const RequestId &other) const
+        {
+            return value == other.value;
+        }
     };
 
     class ProductId
@@ -62,6 +66,10 @@ namespace ReservationDomain
         const std::string &getValue() const
         {
             return value;
+        }
+        bool operator==(const ProductId &other) const
+        {
+            return value == other.value;
         }
     };
 
@@ -85,6 +93,10 @@ namespace ReservationDomain
         {
             return value;
         }
+        bool operator==(const DepartmentId &other) const
+        {
+            return value == other.value;
+        }
     };
 
     class Quantity
@@ -106,6 +118,10 @@ namespace ReservationDomain
         int getValue() const
         {
             return value;
+        }
+         bool operator==(const Quantity &other) const
+        {
+            return value == other.value;
         }
     };
 
