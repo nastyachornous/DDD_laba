@@ -129,6 +129,10 @@ namespace ReservationDomain
         {
             return value;
         }
+        bool operator==(const AvailableQuantity &other) const
+        {
+            return value == other.value;
+        }
     };
 
 }
