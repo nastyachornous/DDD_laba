@@ -76,6 +76,26 @@ void testSuccessfulReservation()
     check(
         "Successful request has Reserved status",
         request.getStatus() == ReservationStatus::Reserved);
+    
+     check(
+        "Reservation contains correct request ID",
+        result.has_value() &&
+        result->requestId.getValue() == "REQ-001");
+
+    check(
+        "Reservation contains correct product ID",
+        result.has_value() &&
+        result->productId.getValue() == "PROD-001");
+
+    check(
+        "Reservation contains correct department ID",
+        result.has_value() &&
+        result->departmentId.getValue() == "DEPT-001");
+
+    check(
+        "Reservation contains correct quantity",
+        result.has_value() &&
+        result->quantity.getValue() == 10);
 }
 
 void testReservationWithEqualQuantity()
@@ -88,6 +108,15 @@ void testReservationWithEqualQuantity()
     check(
         "Reservation succeeds when requested and available quantities are equal",
         result.has_value());
+    
+     check(
+        "Equal quantity reservation has Reserved status",
+        request.getStatus() == ReservationStatus::Reserved);
+
+    check(
+        "Equal quantity reservation contains requested quantity",
+        result.has_value() &&
+        result->quantity.getValue() == 10);
 }
 
 void testInsufficientStock()
