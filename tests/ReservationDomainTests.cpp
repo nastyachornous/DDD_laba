@@ -135,9 +135,9 @@ void testInsufficientStock()
         request.getStatus() == ReservationStatus::Rejected);
 
     check(
-        "Rejection reason is provided",
+        "Rejection reason is provided correctly with quantities",
         request.getRejectionReason() ==
-        "Insufficient available quantity");
+        "Недостатня кількість товару. Запитано: 10, Доступно: 5");
 }
 
 void testZeroAvailableStock()
@@ -150,6 +150,15 @@ void testZeroAvailableStock()
     check(
         "Reservation is rejected when no stock is available",
         !result.has_value());
+        
+    check(
+        "Request has Rejected status for zero stock",
+        request.getStatus() == ReservationStatus::Rejected);
+        
+    check(
+        "Rejection reason for zero stock is provided correctly",
+        request.getRejectionReason() ==
+        "Недостатня кількість товару. Запитано: 1, Доступно: 0");
 }
 
 void testInvalidRequestedQuantity()
