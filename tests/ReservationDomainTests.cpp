@@ -196,6 +196,85 @@ void testRepeatedProcessing()
         });
 }
 
+void testEntityIdentity()
+{
+    ReservationRequest request1(
+        RequestId("REQ-001"),
+        ProductId("PROD-001"),
+        DepartmentId("DEPT-001"),
+        Quantity(10));
+
+    ReservationRequest request2(
+        RequestId("REQ-002"),
+        ProductId("PROD-001"),
+        DepartmentId("DEPT-001"),
+        Quantity(10));
+
+    check(
+        "Requests with different IDs are different entities",
+        request1.getRequestId() != request2.getRequestId());
+
+    check(
+        "Request identity remains unchanged after processing",
+        [&request1]()
+        {
+            request1.process(AvailableQuantity(15));
+            return request1.getRequestId() == RequestId("REQ-001");
+        }());
+}
+
+void testValueObjectEquality()
+{
+    Quantity quantity1(10);
+    Quantity quantity2(10);
+    Quantity quantity3(15);
+
+    check(
+        "Quantities with equal values are equal",
+        quantity1 == quantity2);
+
+    check(
+        "Quantities with different values are not equal",
+        !(quantity1 == quantity3));
+
+    RequestId id1("REQ-001");
+    RequestId id2("REQ-001");
+    RequestId id3("REQ-002");
+
+    check(
+        "Request IDs with equal values are equal",
+        id1 == id2);
+
+    check(
+        "Request IDs with different values are not equal",
+        !(id1 == id3));
+}
+
+void testStateUnchangedAfterFailedProcessing()
+{
+    ReservationRequest request = createRequest(10);
+
+    request.process(AvailableQuantity(15));
+
+    ReservationStatus previousStatus = request.getStatus();
+    std::string previousReason = request.getRejectionReason();
+
+    checkThrows<std::logic_error>(
+        "Repeated processing throws an exception",
+        [&request]()
+        {
+            request.process(AvailableQuantity(15));
+        });
+
+    check(
+        "Status remains unchanged after failed processing",
+        request.getStatus() == previousStatus);
+
+    check(
+        "Rejection reason remains unchanged after failed processing",
+        request.getRejectionReason() == previousReason);
+}
+
 int main()
 {
     std::cout << "=== RESERVATION DOMAIN TESTS ===\n\n";
@@ -209,7 +288,9 @@ int main()
     testNegativeAvailableQuantity();
     testEmptyRequestId();
     testRepeatedProcessing();
-
+    testEntityIdentity();
+    testValueObjectEquality();
+    testStateUnchangedAfterFailedProcessing();
     std::cout << "\n=== TEST SUMMARY ===\n";
     std::cout << "Passed: " << passedTests << '\n';
     std::cout << "Failed: " << failedTests << '\n';
