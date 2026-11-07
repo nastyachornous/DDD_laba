@@ -43,8 +43,11 @@ namespace ReservationDomain
 
         status = ReservationStatus::Rejected;
 
-        rejectionReason =
-            "Insufficient available quantity";
+        rejectionReason = 
+    "Недостатня кількість товару. Запитано: " + 
+    std::to_string(requestedQuantity.getValue()) + 
+    ", Доступно: " + 
+    std::to_string(availableQuantity.getValue());
 
         return std::nullopt;
     }
