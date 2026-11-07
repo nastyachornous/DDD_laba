@@ -10,7 +10,7 @@ using namespace ReservationDomain;
 int passedTests = 0;
 int failedTests = 0;
 
-void check(const std::string &testName, bool condition)
+void check(const std::string& testName, bool condition)
 {
     if (condition)
     {
@@ -26,7 +26,7 @@ void check(const std::string &testName, bool condition)
 
 template <typename ExceptionType, typename Function>
 void checkThrows(
-    const std::string &testName,
+    const std::string& testName,
     Function function)
 {
     try
@@ -34,7 +34,7 @@ void checkThrows(
         function();
         check(testName, false);
     }
-    catch (const ExceptionType &)
+    catch (const ExceptionType&)
     {
         check(testName, true);
     }
@@ -76,8 +76,8 @@ void testSuccessfulReservation()
     check(
         "Successful request has Reserved status",
         request.getStatus() == ReservationStatus::Reserved);
-    
-     check(
+
+    check(
         "Reservation contains correct request ID",
         result.has_value() &&
         result->requestId.getValue() == "REQ-001");
@@ -108,8 +108,8 @@ void testReservationWithEqualQuantity()
     check(
         "Reservation succeeds when requested and available quantities are equal",
         result.has_value());
-    
-     check(
+
+    check(
         "Equal quantity reservation has Reserved status",
         request.getStatus() == ReservationStatus::Reserved);
 
@@ -137,7 +137,7 @@ void testInsufficientStock()
     check(
         "Rejection reason is provided",
         request.getRejectionReason() ==
-            "Insufficient available quantity");
+        "Insufficient available quantity");
 }
 
 void testZeroAvailableStock()
@@ -212,8 +212,7 @@ void testEntityIdentity()
 
     check(
         "Requests with different IDs are different entities",
-        request1.getRequestId() != request2.getRequestId());
-
+        !(request1.getRequestId() == request2.getRequestId()));
     check(
         "Request identity remains unchanged after processing",
         [&request1]()
