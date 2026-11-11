@@ -9,6 +9,8 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 add_library(
     reservation_domain
     src/Model/ReservationRequest.cpp
+    src/Application/Services/ReservationService.cpp
+
 )
 
 target_include_directories(
