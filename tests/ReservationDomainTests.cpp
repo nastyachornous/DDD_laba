@@ -10,7 +10,7 @@ using namespace ReservationDomain;
 int passedTests = 0;
 int failedTests = 0;
 
-void check(const std::string& testName, bool condition)
+void check(const std::string &testName, bool condition)
 {
     if (condition)
     {
@@ -26,7 +26,7 @@ void check(const std::string& testName, bool condition)
 
 template <typename ExceptionType, typename Function>
 void checkThrows(
-    const std::string& testName,
+    const std::string &testName,
     Function function)
 {
     try
@@ -34,7 +34,7 @@ void checkThrows(
         function();
         check(testName, false);
     }
-    catch (const ExceptionType&)
+    catch (const ExceptionType &)
     {
         check(testName, true);
     }
@@ -80,22 +80,22 @@ void testSuccessfulReservation()
     check(
         "Reservation contains correct request ID",
         result.has_value() &&
-        result->requestId.getValue() == "REQ-001");
+            result->requestId.getValue() == "REQ-001");
 
     check(
         "Reservation contains correct product ID",
         result.has_value() &&
-        result->productId.getValue() == "PROD-001");
+            result->productId.getValue() == "PROD-001");
 
     check(
         "Reservation contains correct department ID",
         result.has_value() &&
-        result->departmentId.getValue() == "DEPT-001");
+            result->departmentId.getValue() == "DEPT-001");
 
     check(
         "Reservation contains correct quantity",
         result.has_value() &&
-        result->quantity.getValue() == 10);
+            result->quantity.getValue() == 10);
 }
 
 void testReservationWithEqualQuantity()
@@ -116,7 +116,7 @@ void testReservationWithEqualQuantity()
     check(
         "Equal quantity reservation contains requested quantity",
         result.has_value() &&
-        result->quantity.getValue() == 10);
+            result->quantity.getValue() == 10);
 }
 
 void testInsufficientStock()
@@ -137,7 +137,7 @@ void testInsufficientStock()
     check(
         "Rejection reason is provided correctly with quantities",
         request.getRejectionReason() ==
-        "Недостатня кількість товару. Запитано: 10, Доступно: 5");
+            "Недостатня кількість товару. Запитано: 10, Доступно: 5");
 }
 
 void testZeroAvailableStock()
@@ -150,15 +150,15 @@ void testZeroAvailableStock()
     check(
         "Reservation is rejected when no stock is available",
         !result.has_value());
-        
+
     check(
         "Request has Rejected status for zero stock",
         request.getStatus() == ReservationStatus::Rejected);
-        
+
     check(
         "Rejection reason for zero stock is provided correctly",
         request.getRejectionReason() ==
-        "Недостатня кількість товару. Запитано: 1, Доступно: 0");
+            "Недостатня кількість товару. Запитано: 1, Доступно: 0");
 }
 
 void testInvalidRequestedQuantity()
@@ -283,6 +283,137 @@ void testStateUnchangedAfterFailedProcessing()
         request.getRejectionReason() == previousReason);
 }
 
+// 4 лабораторна
+
+void testRestoreSubmitted()
+{
+    ReservationRequest request = ReservationRequest::restore(
+        RequestId("REQ-001"),
+        ProductId("PROD-001"),
+        DepartmentId("DEPT-001"),
+        Quantity(10),
+        ReservationStatus::Submitted,
+        "");
+
+    check(
+        "Restored request has Submitted status",
+        request.getStatus() == ReservationStatus::Submitted);
+
+    check(
+        "Restored Submitted request has empty rejection reason",
+        request.getRejectionReason().empty());
+
+    check(
+        "Restored request contains correct quantity",
+        request.getRequestedQuantity().getValue() == 10);
+}
+
+void testRestoreReserved()
+{
+    ReservationRequest request = ReservationRequest::restore(
+        RequestId("REQ-002"),
+        ProductId("PROD-001"),
+        DepartmentId("DEPT-001"),
+        Quantity(10),
+        ReservationStatus::Reserved,
+        "");
+
+    check(
+        "Restored request has Reserved status",
+        request.getStatus() == ReservationStatus::Reserved);
+
+    checkThrows<std::logic_error>(
+        "Restored Reserved request cannot be processed again",
+        [&request]()
+        {
+            request.process(AvailableQuantity(15));
+        });
+}
+
+void testRestoreRejected()
+{
+    const std::string reason =
+        "Недостатня кількість товару. Запитано: 10, Доступно: 5";
+
+    ReservationRequest request = ReservationRequest::restore(
+        RequestId("REQ-003"),
+        ProductId("PROD-001"),
+        DepartmentId("DEPT-001"),
+        Quantity(10),
+        ReservationStatus::Rejected,
+        reason);
+
+    check(
+        "Restored request has Rejected status",
+        request.getStatus() == ReservationStatus::Rejected);
+
+    check(
+        "Rejection reason is preserved after restoration",
+        request.getRejectionReason() == reason);
+
+    checkThrows<std::logic_error>(
+        "Restored Rejected request cannot be processed again",
+        [&request]()
+        {
+            request.process(AvailableQuantity(15));
+        });
+}
+
+void testRestoreInvalidStates()
+{
+    checkThrows<std::invalid_argument>(
+        "Rejected request without reason cannot be restored",
+        []()
+        {
+            ReservationRequest::restore(
+                RequestId("REQ-004"),
+                ProductId("PROD-001"),
+                DepartmentId("DEPT-001"),
+                Quantity(10),
+                ReservationStatus::Rejected,
+                "");
+        });
+
+    checkThrows<std::invalid_argument>(
+        "Submitted request with rejection reason cannot be restored",
+        []()
+        {
+            ReservationRequest::restore(
+                RequestId("REQ-005"),
+                ProductId("PROD-001"),
+                DepartmentId("DEPT-001"),
+                Quantity(10),
+                ReservationStatus::Submitted,
+                "Some reason");
+        });
+
+    checkThrows<std::invalid_argument>(
+        "Reserved request with rejection reason cannot be restored",
+        []()
+        {
+            ReservationRequest::restore(
+                RequestId("REQ-006"),
+                ProductId("PROD-001"),
+                DepartmentId("DEPT-001"),
+                Quantity(10),
+                ReservationStatus::Reserved,
+                "Some reason");
+        });
+
+    checkThrows<std::invalid_argument>(
+        "Unknown status cannot be restored",
+        []()
+        {
+            ReservationRequest::restore(
+                RequestId("REQ-007"),
+                ProductId("PROD-001"),
+                DepartmentId("DEPT-001"),
+                Quantity(10),
+                static_cast<ReservationStatus>(999),
+                "");
+        });
+}
+
 int main()
 {
     std::cout << "=== RESERVATION DOMAIN TESTS ===\n\n";
@@ -299,6 +430,11 @@ int main()
     testEntityIdentity();
     testValueObjectEquality();
     testStateUnchangedAfterFailedProcessing();
+    // 4 лабораторна
+    testRestoreSubmitted();
+    testRestoreReserved();
+    testRestoreRejected();
+    testRestoreInvalidStates();
     std::cout << "\n=== TEST SUMMARY ===\n";
     std::cout << "Passed: " << passedTests << '\n';
     std::cout << "Failed: " << failedTests << '\n';

@@ -1,3 +1,4 @@
+
 #ifndef RESERVATION_REQUEST_H
 #define RESERVATION_REQUEST_H
 
@@ -40,6 +41,15 @@ namespace ReservationDomain
             const ProductId &productId,
             const DepartmentId &departmentId,
             const Quantity &requestedQuantity);
+
+        // Оновлення лабораторної №4
+        static ReservationRequest restore(
+            const RequestId &requestId,
+            const ProductId &productId,
+            const DepartmentId &departmentId,
+            const Quantity &requestedQuantity,
+            ReservationStatus status,
+            const std::string &rejectionReason);
 
         std::optional<Reservation> process(
             const AvailableQuantity &availableQuantity);
