@@ -36,3 +36,19 @@ add_test(
     NAME ReservationDomainTests
     COMMAND reservation_domain_tests
 )
+
+add_executable(
+    reservation_application_tests
+    tests/ReservationApplicationTests.cpp
+)
+
+target_link_libraries(
+    reservation_application_tests
+    PRIVATE
+    reservation_domain
+)
+
+add_test(
+    NAME ReservationApplicationTests
+    COMMAND reservation_application_tests
+)
