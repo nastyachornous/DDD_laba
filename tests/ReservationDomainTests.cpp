@@ -1,12 +1,12 @@
 #include "../src/Model/ReservationRequest.h"
-
+#include "../src/Application/Services/ReservationService.h"
 #include <iostream>
 #include <stdexcept>
 #include <string>
 #include <optional>
 
 using namespace ReservationDomain;
-
+using namespace ReservationApplication;
 int passedTests = 0;
 int failedTests = 0;
 
@@ -414,6 +414,282 @@ void testRestoreInvalidStates()
         });
 }
 
+// ================= APPLICATION TESTS =================
+
+class FakeReservationRepository : public IReservationRepository
+{
+public:
+  std::optional<ReservationRequest> storedRequest;
+  bool saveCalled = false;
+  bool failSave = false;
+  std::optional<ReservationRequest> findById(
+    const RequestId& requestId) override
+  {
+    if (!storedRequest.has_value())
+    {
+      return std::nullopt;
+    }
+
+    if (!(storedRequest->getRequestId() == requestId))
+    {
+      return std::nullopt;
+    }
+
+    return storedRequest;
+  }
+
+  void save(const ReservationRequest& request) override
+  {
+    saveCalled = true;
+
+    if (failSave)
+    {
+      throw std::runtime_error("Save failed");
+    }
+
+    storedRequest = request;
+  }
+};
+
+class FakeUnitOfWork : public IUnitOfWork
+{
+public:
+  bool commitCalled = false;
+  bool rollbackCalled = false;
+  bool failCommit = false;
+
+  void commit() override
+  {
+    commitCalled = true;
+
+    if (failCommit)
+    {
+      throw std::runtime_error("Commit failed");
+    }
+  }
+
+  void rollback() override
+  {
+    rollbackCalled = true;
+  }
+};
+
+class FakeStockAvailability : public IStockAvailabilityPort
+{
+public:
+  int availableQuantity = 10;
+  bool fail = false;
+
+  AvailableQuantity getAvailableQuantity(
+    const ProductId& productId) override
+  {
+    if (fail)
+    {
+      throw std::runtime_error("Stock service unavailable");
+    }
+
+    return AvailableQuantity(availableQuantity);
+  }
+};
+
+ReservationRequest createApplicationRequest()
+{
+  return ReservationRequest(
+    RequestId("REQ-APP-001"),
+    ProductId("PROD-APP-001"),
+    DepartmentId("DEPT-APP-001"),
+    Quantity(5));
+}
+
+// 1. Успішне резервування
+void testApplicationSuccessfulReservation()
+{
+  FakeReservationRepository repository;
+  repository.storedRequest = createApplicationRequest();
+
+  FakeUnitOfWork unitOfWork;
+
+  FakeStockAvailability stock;
+  stock.availableQuantity = 10;
+
+  ReservationService service(repository, unitOfWork, stock);
+
+  auto result = service.processRequest(RequestId("REQ-APP-001"));
+
+  check(
+    "Application: successful reservation returns Reserved status",
+    result.status == ReservationStatus::Reserved);
+
+  check(
+    "Application: successful reservation is returned",
+    result.reservation.has_value());
+
+  check(
+    "Application: request is saved",
+    repository.saveCalled);
+
+  check(
+    "Application: transaction is committed",
+    unitOfWork.commitCalled && !unitOfWork.rollbackCalled);
+}
+
+// 2. Недостатня кількість товару
+void testApplicationInsufficientStock()
+{
+  FakeReservationRepository repository;
+  repository.storedRequest = createApplicationRequest();
+
+  FakeUnitOfWork unitOfWork;
+
+  FakeStockAvailability stock;
+  stock.availableQuantity = 2;
+
+  ReservationService service(repository, unitOfWork, stock);
+
+  auto result = service.processRequest(RequestId("REQ-APP-001"));
+
+  check(
+    "Application: insufficient stock returns Rejected status",
+    result.status == ReservationStatus::Rejected);
+
+  check(
+    "Application: rejected request has no reservation",
+    !result.reservation.has_value());
+
+  check(
+    "Application: rejection reason is provided",
+    !result.rejectionReason.empty());
+
+  check(
+    "Application: rejected request is saved and committed",
+    repository.saveCalled && unitOfWork.commitCalled);
+
+  check(
+    "Application: business rejection does not cause rollback",
+    !unitOfWork.rollbackCalled);
+}
+
+// 3. Запит не знайдено
+void testApplicationRequestNotFound()
+{
+  FakeReservationRepository repository;
+
+  FakeUnitOfWork unitOfWork;
+  FakeStockAvailability stock;
+
+  ReservationService service(repository, unitOfWork, stock);
+
+  checkThrows<std::runtime_error>(
+    "Application: missing request throws an exception",
+    [&service]()
+    {
+      service.processRequest(RequestId("UNKNOWN"));
+    });
+
+  check(
+    "Application: missing request does not commit",
+    !unitOfWork.commitCalled);
+
+  check(
+    "Application: missing request does not call rollback",
+    !unitOfWork.rollbackCalled);
+}
+
+// 4. Помилка сервісу перевірки залишків
+void testApplicationStockServiceException()
+{
+  FakeReservationRepository repository;
+  repository.storedRequest = createApplicationRequest();
+
+  FakeUnitOfWork unitOfWork;
+
+  FakeStockAvailability stock;
+  stock.fail = true;
+
+  ReservationService service(repository, unitOfWork, stock);
+
+  checkThrows<std::runtime_error>(
+    "Application: stock service exception is propagated",
+    [&service]()
+    {
+      service.processRequest(RequestId("REQ-APP-001"));
+    });
+
+  check(
+    "Application: stock service exception causes rollback",
+    unitOfWork.rollbackCalled);
+
+  check(
+    "Application: stock service exception does not commit",
+    !unitOfWork.commitCalled);
+
+  check(
+    "Application: request is not saved after stock service exception",
+    !repository.saveCalled);
+}
+
+// 5. Помилка commit
+void testApplicationCommitFailure()
+{
+  FakeReservationRepository repository;
+  repository.storedRequest = createApplicationRequest();
+
+  FakeUnitOfWork unitOfWork;
+  unitOfWork.failCommit = true;
+
+  FakeStockAvailability stock;
+  stock.availableQuantity = 10;
+
+  ReservationService service(repository, unitOfWork, stock);
+
+  checkThrows<std::runtime_error>(
+    "Application: commit exception is propagated",
+    [&service]()
+    {
+      service.processRequest(RequestId("REQ-APP-001"));
+    });
+
+  check(
+    "Application: commit failure causes rollback",
+    unitOfWork.commitCalled && unitOfWork.rollbackCalled);
+
+  check(
+    "Application: request was passed to repository before commit",
+    repository.saveCalled);
+}
+// 6. Save failure
+void testApplicationSaveFailure()
+{
+  FakeReservationRepository repository;
+  repository.storedRequest = createApplicationRequest();
+  repository.failSave = true;
+
+  FakeUnitOfWork unitOfWork;
+
+  FakeStockAvailability stock;
+  stock.availableQuantity = 10;
+
+  ReservationService service(repository, unitOfWork, stock);
+
+  checkThrows<std::runtime_error>(
+    "Application: save exception is propagated",
+    [&service]()
+    {
+      service.processRequest(RequestId("REQ-APP-001"));
+    });
+
+  check(
+    "Application: repository save was attempted",
+    repository.saveCalled);
+
+  check(
+    "Application: save failure causes rollback",
+    unitOfWork.rollbackCalled);
+
+  check(
+    "Application: save failure does not commit",
+    !unitOfWork.commitCalled);
+}
 int main()
 {
     std::cout << "=== RESERVATION DOMAIN TESTS ===\n\n";
@@ -435,6 +711,14 @@ int main()
     testRestoreReserved();
     testRestoreRejected();
     testRestoreInvalidStates();
+    // Application tests
+    std::cout << "\n=== RESERVATION APPLICATION TESTS ===\n\n";
+    testApplicationSuccessfulReservation();
+    testApplicationInsufficientStock();
+    testApplicationRequestNotFound();
+    testApplicationStockServiceException();
+    testApplicationCommitFailure();
+    testApplicationSaveFailure();
     std::cout << "\n=== TEST SUMMARY ===\n";
     std::cout << "Passed: " << passedTests << '\n';
     std::cout << "Failed: " << failedTests << '\n';
