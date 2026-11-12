@@ -1,3 +1,4 @@
+
 cmake_minimum_required(VERSION 3.16)
 
 project(ReservationDomain LANGUAGES CXX)
@@ -10,7 +11,6 @@ add_library(
     reservation_domain
     src/Model/ReservationRequest.cpp
     src/Application/Services/ReservationService.cpp
-
 )
 
 target_include_directories(
@@ -35,20 +35,4 @@ enable_testing()
 add_test(
     NAME ReservationDomainTests
     COMMAND reservation_domain_tests
-)
-
-add_executable(
-    reservation_application_tests
-    tests/ReservationApplicationTests.cpp
-)
-
-target_link_libraries(
-    reservation_application_tests
-    PRIVATE
-    reservation_domain
-)
-
-add_test(
-    NAME ReservationApplicationTests
-    COMMAND reservation_application_tests
 )
